@@ -2,11 +2,16 @@
 
 import OpenAI from 'openai';
 
+import { MessageT } from '@/types';
+import { useModelStore } from '@/store';
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export async function sendMessage(base64Audio: string) {
+export async function sendMessage(base64Audio: string, messages: MessageT[]) {
+  const { selectedModel, selectedSpeaker } = useModelStore.getState();
+  const newMessages: MessageT[] = [];
   try {
     // Convert base64 to Blob
     const binaryStr = Buffer.from(base64Audio, 'base64');
@@ -19,21 +24,23 @@ export async function sendMessage(base64Audio: string) {
     });
 
     const userText = transcriptionResponse.text;
+    newMessages.push({ role: 'user', content: userText });
 
     // 2. Get GPT-4 response
     const chatResponse = await openai.chat.completions.create({
-      model: 'gpt-4o-2024-11-20',
-      messages: [{ role: 'user', content: userText }],
+      model: selectedModel,
+      messages: [...messages, { role: 'user', content: userText }],
     });
 
     const assistantResponse = chatResponse.choices[0].message.content;
+    newMessages.push({ role: 'assistant', content: assistantResponse ?? '' });
 
     if (!assistantResponse) throw new Error('No response from GPT');
 
     // 3. Convert response to speech
     const speechResponse = await openai.audio.speech.create({
       model: 'tts-1',
-      voice: 'alloy',
+      voice: selectedSpeaker,
       input: assistantResponse,
     });
 
@@ -44,10 +51,7 @@ export async function sendMessage(base64Audio: string) {
     return {
       success: true,
       audioData: base64Response,
-      text: {
-        user: userText,
-        assistant: assistantResponse,
-      },
+      messages: newMessages,
     };
   } catch (error) {
     console.error('Error in sendMessage:', error);

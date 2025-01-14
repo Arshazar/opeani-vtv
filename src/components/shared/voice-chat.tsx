@@ -1,16 +1,17 @@
 'use client';
 import { useState, useRef } from 'react';
+import { Mic, Square } from 'lucide-react';
+
 import { sendMessage } from '@/app/actions/chat';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Mic, Square } from 'lucide-react';
+import { useConversationStore } from '@/store';
 
 export function VoiceChat() {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [error, setError] = useState<string>('');
-  const [conversation, setConversation] = useState<{ user: string; assistant: string }[]>([]);
+  const { messages, addMessages } = useConversationStore();
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioPlayer = useRef<HTMLAudioElement>(new Audio());
@@ -56,14 +57,14 @@ export function VoiceChat() {
       const buffer = await audioBlob.arrayBuffer();
       const base64Audio = Buffer.from(buffer).toString('base64');
 
-      const response = await sendMessage(base64Audio);
+      const response = await sendMessage(base64Audio, messages);
 
       if (!response.success) {
         throw new Error(response.error);
       }
 
-      if (response.text) {
-        setConversation((prev) => [...prev, response.text]);
+      if (response.messages) {
+        addMessages(response.messages);
       }
 
       setIsPlaying(true);
@@ -92,11 +93,15 @@ export function VoiceChat() {
         {isRecording ? <Square className="h-8 w-8" /> : <Mic className="h-8 w-8" />}
       </Button>
 
-      {isProcessing && <p className="text-sm text-muted-foreground">Processing your message...</p>}
-      {isPlaying && (
-        <p className="text-sm text-muted-foreground animate-pulse">Playing response...</p>
+      {isProcessing && (
+        <p className="absolute mt-20 text-sm text-muted-foreground">Processing your message...</p>
       )}
-      {error && <p className="text-destructive">{error}</p>}
+      {isPlaying && (
+        <p className="absolute mt-20 text-sm text-muted-foreground animate-pulse">
+          Playing response...
+        </p>
+      )}
+      {error && <p className="absoulte mt-20 text-destructive">{error}</p>}
     </div>
   );
 }
