@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Mic, Square } from 'lucide-react';
 
 import { sendMessage } from '@/app/actions/chat';
@@ -14,7 +14,17 @@ export function VoiceChat() {
   const { messages, addMessages } = useConversationStore();
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const audioPlayer = useRef<HTMLAudioElement>(new Audio());
+  const audioPlayer = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    audioPlayer.current = new Audio();
+    return () => {
+      if (audioPlayer.current) {
+        audioPlayer.current.pause();
+        audioPlayer.current = null;
+      }
+    };
+  }, []);
 
   const startRecording = async () => {
     try {
@@ -68,8 +78,10 @@ export function VoiceChat() {
       }
 
       setIsPlaying(true);
-      audioPlayer.current.src = `data:audio/mp3;base64,${response.audioData}`;
-      audioPlayer.current.play();
+      if (audioPlayer.current) {
+        audioPlayer.current.src = `data:audio/mp3;base64,${response.audioData}`;
+        audioPlayer.current.play();
+      }
     } catch (err) {
       console.error(err);
       setError('Error processing voice chat');
@@ -78,9 +90,13 @@ export function VoiceChat() {
     }
   };
 
-  audioPlayer.current.onended = () => {
-    setIsPlaying(false);
-  };
+  useEffect(() => {
+    if (audioPlayer.current) {
+      audioPlayer.current.onended = () => {
+        setIsPlaying(false);
+      };
+    }
+  }, []);
 
   return (
     <div className="flex flex-col items-center gap-6 w-full max-w-2xl">
